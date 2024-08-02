@@ -1,42 +1,63 @@
-$(function () {
-  let websocket = new WebSocket("ws://" + window.location.host + "/websocket");
-  let room = $("#chat-text");
+$(document).ready(function() {
+    let ws;
 
-  websocket.addEventListener("open", function (e) {
-      console.log("WebSocket connection opened.");
-  });
+    function setupWebSocket(username, password) {
+        //change to static address
+        ws = new WebSocket("ws://localhost:4444/websocket");
 
-  websocket.addEventListener("message", function (e) {
-      let data = JSON.parse(e.data);
-      let chatContent = `<p><strong>${data.username}</strong>: ${data.text}</p>`;
-      room.append(chatContent);
-      room.scrollTop = room.scrollHeight; // Auto scroll to the bottom
-  });
+        ws.onopen = function() {
+            ws.send(JSON.stringify({ username: username, password: password }));
+        };
 
-  websocket.addEventListener("error", function (e) {
-      console.error("WebSocket error:", e);
-  });
+        ws.onmessage = function(event) {
+            let chatText = $("#chat-text");
+            let data = JSON.parse(event.data);
+            chatText.append(`<div><strong>${data.username}:</strong> ${data.text}</div>`);
+        };
+    }
 
-  websocket.addEventListener("close", function (e) {
-      console.log("WebSocket connection closed.");
-  });
+    $("#register-form").submit(function(event) {
+        event.preventDefault();
+        let username = $("#register-username").val();
+        let password = $("#register-password").val();
+        $.ajax({
+            url: "/register",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ username: username, password: password }),
+            success: function() {
+                alert("Registration successful!");
+            },
+            error: function(xhr) {
+                alert("Error: " + xhr.responseText);
+            }
+        });
+    });
 
-  $("#input-form").on("submit", function (event) {
-      event.preventDefault();
-      let username = $("#input-username")[0].value;
-      let text = $("#input-text")[0].value;
+    $("#login-form").submit(function(event) {
+        event.preventDefault();
+        let username = $("#login-username").val();
+        let password = $("#login-password").val();
+        $.ajax({
+            url: "/login",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ username: username, password: password }),
+            success: function() {
+                $("#register-login-form").hide();
+                $("#chat-room").show();
+                setupWebSocket(username, password);
+            },
+            error: function(xhr) {
+                alert("Error: " + xhr.responseText);
+            }
+        });
+    });
 
-      if (username === "" || text === "") {
-          alert("Please enter both username and message.");
-          return;
-      }
-
-      websocket.send(
-          JSON.stringify({
-              username: username,
-              text: text,
-          })
-      );
-      $("#input-text")[0].value = "";
-  });
+    $("#input-form").submit(function(event) {
+        event.preventDefault();
+        let inputText = $("#input-text").val();
+        ws.send(JSON.stringify({ text: inputText }));
+        $("#input-text").val("");
+    });
 });
